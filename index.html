@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GTA Mobile Final</title>
+<style>
+body { margin:0; overflow:hidden; background:#111; touch-action:none; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<script>
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+
+function resize(){
+  c.width = innerWidth;
+  c.height = innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+// joystick
+const joy = { baseX:100, baseY:0, x:100, y:0, active:false };
+function updateJoy(){ joy.baseY = c.height-120; joy.y = joy.baseY; }
+updateJoy();
+
+// fire
+function fireX(){ return c.width-100 }
+function fireY(){ return c.height-120 }
+
+let moveTouchId=null;
+let fireTouchId=null;
+
+let bullets=[], enemies=[];
+
+let player = { x:1000,y:1000,angle:0,speed:3,hp:100 };
+let gameOver=false;
+
+// map
+const TILE=80, MAP_W=40, MAP_H=40;
+let map=[];
+for(let y=0;y<MAP_H;y++){
+  map[y]=[];
+  for(let x=0;x<MAP_W;x++){
+    let r=Math.random();
+    if(r<0.1) map[y][x]="water";
+    else if(r<0.3) map[y][x]="road";
+    else map[y][x]="grass";
+  }
+}
+
+// touch
+c.addEventListener("touchstart", e=>{
+  for(let t of e.changedTouches){
+
+    if(gameOver){
+      let bx=c.width/2-80, by=c.height/2+20;
+      if(t.clientX>bx && t.clientX<bx+160 &&
+         t.clientY>by && t.clientY<by+50){
+        restart();
+      }
+      return;
+    }
+
+    if(Math.hypot(t.clientX-joy.baseX,t.clientY-joy.baseY)<60 && moveTouchId===null){
+      moveTouchId=t.identifier;
+      joy.active=true;
+    }
+
+    if(Math.hypot(t.clientX-fireX(),t.clientY-fireY())<40){
+      fireTouchId = t.identifier; // 👈 HOLD FIRE
+    }
+  }
+});
+
+c.addEventListener("touchmove", e=>{
+  if(gameOver) return;
+
+  for(let t of e.changedTouches){
+    if(t.identifier===moveTouchId){
+      joy.x=t.clientX;
+      joy.y=t.clientY;
+    }
+  }
+});
+
+c.addEventListener("touchend", e=>{
+  for(let t of e.changedTouches){
+    if(t.identifier===moveTouchId){
+      moveTouchId=null;
+      joy.active=false;
+      joy.x=joy.baseX;
+      joy.y=joy.baseY;
+    }
+    if(t.identifier===fireTouchId){
+      fireTouchId=null; // stop firing
+    }
+  }
+});
+
+// shoot
+function shoot(){
+  bullets.push({
+    x:player.x,
+    y:player.y,
+    vx:Math.cos(player.angle)*10,
+    vy:Math.sin(player.angle)*10
+  });
+}
+
+// auto fire (IMPORTANT 🔥)
+setInterval(()=>{
+  if(fireTouchId!==null && !gameOver){
+    shoot();
+  }
+},150);
+
+// enemy spawn
+setInterval(()=>{
+  if(gameOver) return;
+
+  let a=Math.random()*Math.PI*2;
+  let d=300+Math.random()*200;
+
+  enemies.push({
+    x:player.x+Math.cos(a)*d,
+    y:player.y+Math.sin(a)*d,
+    speed:1.5
+  });
+},800);
+
+// restart
+function restart(){
+  player.hp=100;
+  player.x=1000;
+  player.y=1000;
+  bullets=[];
+  enemies=[];
+  gameOver=false;
+}
+
+// draw map
+function drawMap(camX,camY){
+  for(let y=0;y<MAP_H;y++){
+    for(let x=0;x<MAP_W;x++){
+      let t=map[y][x];
+      if(t==="grass") ctx.fillStyle="#2ecc71";
+      if(t==="road") ctx.fillStyle="#222";
+      if(t==="water") ctx.fillStyle="#3498db";
+
+      ctx.fillRect(x*TILE-camX,y*TILE-camY,TILE,TILE);
+    }
+  }
+}
+
+// loop
+function update(){
+  ctx.clearRect(0,0,c.width,c.height);
+
+  let camX=player.x-c.width/2;
+  let camY=player.y-c.height/2;
+
+  // movement
+  if(joy.active){
+    let dx=joy.x-joy.baseX;
+    let dy=joy.y-joy.baseY;
+    let dist=Math.hypot(dx,dy);
+
+    if(dist>5){
+      player.angle=Math.atan2(dy,dx);
+      player.x+=Math.cos(player.angle)*player.speed;
+      player.y+=Math.sin(player.angle)*player.speed;
+    }
+  }
+
+  drawMap(camX,camY);
+
+  // player
+  ctx.save();
+  ctx.translate(player.x-camX,player.y-camY);
+  ctx.rotate(player.angle);
+  ctx.beginPath();
+  ctx.moveTo(15,0);
+  ctx.lineTo(-10,-8);
+  ctx.lineTo(-10,8);
+  ctx.closePath();
+  ctx.fillStyle="cyan";
+  ctx.fill();
+  ctx.restore();
+
+  // bullets
+  for(let i=bullets.length-1;i>=0;i--){
+    let b=bullets[i];
+    b.x+=b.vx; b.y+=b.vy;
+
+    ctx.fillStyle="yellow";
+    ctx.fillRect(b.x-camX,b.y-camY,4,4);
+  }
+
+  // enemies
+  for(let i=enemies.length-1;i>=0;i--){
+    let e=enemies[i];
+
+    let dx=player.x-e.x;
+    let dy=player.y-e.y;
+    let dist=Math.hypot(dx,dy);
+
+    if(dist>1){
+      e.x+=dx/dist*e.speed;
+      e.y+=dy/dist*e.speed;
+    }
+
+    ctx.fillStyle="red";
+    ctx.fillRect(e.x-camX,e.y-camY,20,20);
+
+    if(dist<20){
+      player.hp-=0.4;
+      if(player.hp<=0){
+        player.hp=0;
+        gameOver=true;
+      }
+    }
+
+    for(let j=bullets.length-1;j>=0;j--){
+      let b=bullets[j];
+      if(b.x<e.x+20 && b.x+4>e.x && b.y<e.y+20 && b.y+4>e.y){
+        enemies.splice(i,1);
+        bullets.splice(j,1);
+        break;
+      }
+    }
+  }
+
+  // ❤️ health
+  let barW=c.width*0.5;
+  let hx=c.width/2-barW/2;
+  let hy=c.height-90;
+
+  ctx.fillStyle="black";
+  ctx.fillRect(hx-5,hy-5,barW+10,25);
+
+  ctx.fillStyle="red";
+  ctx.fillRect(hx,hy,barW,15);
+
+  ctx.fillStyle="lime";
+  ctx.fillRect(hx,hy,(player.hp/100)*barW,15);
+
+  // joystick
+  ctx.beginPath();
+  ctx.arc(joy.baseX,joy.baseY,50,0,Math.PI*2);
+  ctx.strokeStyle="white"; ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(joy.x,joy.y,20,0,Math.PI*2);
+  ctx.fillStyle="white"; ctx.fill();
+
+  // fire
+  ctx.beginPath();
+  ctx.arc(fireX(),fireY(),40,0,Math.PI*2);
+  ctx.fillStyle="red"; ctx.fill();
+
+  // 🗺️ MINI MAP
+  let miniX=10, miniY=10, size=120;
+  let scale=size/(MAP_W*TILE);
+
+  ctx.fillStyle="black";
+  ctx.fillRect(miniX,miniY,size,size);
+
+  for(let y1=0;y1<MAP_H;y1++){
+    for(let x1=0;x1<MAP_W;x1++){
+      let t=map[y1][x1];
+      if(t==="grass") ctx.fillStyle="#2ecc71";
+      if(t==="road") ctx.fillStyle="#555";
+      if(t==="water") ctx.fillStyle="#3498db";
+
+      ctx.fillRect(miniX+x1*TILE*scale,miniY+y1*TILE*scale,TILE*scale,TILE*scale);
+    }
+  }
+
+  // player dot
+  ctx.fillStyle="white";
+  ctx.fillRect(miniX+player.x*scale,miniY+player.y*scale,4,4);
+
+  // enemy dots
+  enemies.forEach(e=>{
+    ctx.fillStyle="red";
+    ctx.fillRect(miniX+e.x*scale,miniY+e.y*scale,3,3);
+  });
+
+  // game over
+  if(gameOver){
+    ctx.fillStyle="rgba(0,0,0,0.5)";
+    ctx.fillRect(0,0,c.width,c.height);
+
+    ctx.fillStyle="#222";
+    ctx.fillRect(c.width/2-150,c.height/2-80,300,160);
+
+    ctx.fillStyle="white";
+    ctx.font="28px Arial";
+    ctx.fillText("GAME OVER",c.width/2-100,c.height/2-20);
+
+    ctx.fillStyle="red";
+    ctx.fillRect(c.width/2-80,c.height/2+20,160,50);
+
+    ctx.fillStyle="white";
+    ctx.fillText("🔃 Play Again",c.width/2-65,c.height/2+50);
+  }
+
+  requestAnimationFrame(update);
+}
+
+update();
+</script>
+</body>
+</html>
