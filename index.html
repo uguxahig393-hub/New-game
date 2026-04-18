@@ -22,14 +22,19 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-// joystick
-const joy = { baseX:100, baseY:0, x:100, y:0, active:false };
-function updateJoy(){ joy.baseY = c.height-120; joy.y = joy.baseY; }
+// 🔥 BIGGER JOYSTICK
+const joy = { baseX:130, baseY:0, x:130, y:0, active:false, r:70, knob:30 };
+function updateJoy(){ joy.baseY = c.height-150; joy.y = joy.baseY; }
 updateJoy();
 
-// fire
-function fireX(){ return c.width-100 }
-function fireY(){ return c.height-120 }
+// 🔥 BIGGER FIRE BUTTON
+function fireX(){ return c.width-130 }
+function fireY(){ return c.height-150 }
+const fireR = 70;
+
+// bullet image
+const bulletImg = new Image();
+bulletImg.src = "https://cdn-icons-png.flaticon.com/512/3097/3097144.png";
 
 let moveTouchId=null;
 let fireTouchId=null;
@@ -57,28 +62,27 @@ c.addEventListener("touchstart", e=>{
   for(let t of e.changedTouches){
 
     if(gameOver){
-      let bx=c.width/2-80, by=c.height/2+20;
-      if(t.clientX>bx && t.clientX<bx+160 &&
-         t.clientY>by && t.clientY<by+50){
+      let bx=c.width/2-100, by=c.height/2+30;
+      if(t.clientX>bx && t.clientX<bx+200 &&
+         t.clientY>by && t.clientY<by+60){
         restart();
       }
       return;
     }
 
-    if(Math.hypot(t.clientX-joy.baseX,t.clientY-joy.baseY)<60 && moveTouchId===null){
+    if(Math.hypot(t.clientX-joy.baseX,t.clientY-joy.baseY)<joy.r && moveTouchId===null){
       moveTouchId=t.identifier;
       joy.active=true;
     }
 
-    if(Math.hypot(t.clientX-fireX(),t.clientY-fireY())<40){
-      fireTouchId = t.identifier; // 👈 HOLD FIRE
+    if(Math.hypot(t.clientX-fireX(),t.clientY-fireY())<fireR){
+      fireTouchId=t.identifier;
     }
   }
 });
 
 c.addEventListener("touchmove", e=>{
   if(gameOver) return;
-
   for(let t of e.changedTouches){
     if(t.identifier===moveTouchId){
       joy.x=t.clientX;
@@ -96,7 +100,7 @@ c.addEventListener("touchend", e=>{
       joy.y=joy.baseY;
     }
     if(t.identifier===fireTouchId){
-      fireTouchId=null; // stop firing
+      fireTouchId=null;
     }
   }
 });
@@ -111,14 +115,14 @@ function shoot(){
   });
 }
 
-// auto fire (IMPORTANT 🔥)
+// auto fire
 setInterval(()=>{
   if(fireTouchId!==null && !gameOver){
     shoot();
   }
 },150);
 
-// enemy spawn
+// enemies
 setInterval(()=>{
   if(gameOver) return;
 
@@ -183,9 +187,9 @@ function update(){
   ctx.translate(player.x-camX,player.y-camY);
   ctx.rotate(player.angle);
   ctx.beginPath();
-  ctx.moveTo(15,0);
-  ctx.lineTo(-10,-8);
-  ctx.lineTo(-10,8);
+  ctx.moveTo(20,0);
+  ctx.lineTo(-12,-10);
+  ctx.lineTo(-12,10);
   ctx.closePath();
   ctx.fillStyle="cyan";
   ctx.fill();
@@ -197,15 +201,13 @@ function update(){
     b.x+=b.vx; b.y+=b.vy;
 
     ctx.fillStyle="yellow";
-    ctx.fillRect(b.x-camX,b.y-camY,4,4);
+    ctx.fillRect(b.x-camX,b.y-camY,5,5);
   }
 
   // enemies
   for(let i=enemies.length-1;i>=0;i--){
     let e=enemies[i];
-
-    let dx=player.x-e.x;
-    let dy=player.y-e.y;
+    let dx=player.x-e.x, dy=player.y-e.y;
     let dist=Math.hypot(dx,dy);
 
     if(dist>1){
@@ -214,9 +216,9 @@ function update(){
     }
 
     ctx.fillStyle="red";
-    ctx.fillRect(e.x-camX,e.y-camY,20,20);
+    ctx.fillRect(e.x-camX,e.y-camY,25,25);
 
-    if(dist<20){
+    if(dist<25){
       player.hp-=0.4;
       if(player.hp<=0){
         player.hp=0;
@@ -226,7 +228,7 @@ function update(){
 
     for(let j=bullets.length-1;j>=0;j--){
       let b=bullets[j];
-      if(b.x<e.x+20 && b.x+4>e.x && b.y<e.y+20 && b.y+4>e.y){
+      if(b.x<e.x+25 && b.x+5>e.x && b.y<e.y+25 && b.y+5>e.y){
         enemies.splice(i,1);
         bullets.splice(j,1);
         break;
@@ -235,35 +237,41 @@ function update(){
   }
 
   // ❤️ health
-  let barW=c.width*0.5;
+  let barW=c.width*0.6;
   let hx=c.width/2-barW/2;
-  let hy=c.height-90;
+  let hy=c.height-110;
 
   ctx.fillStyle="black";
-  ctx.fillRect(hx-5,hy-5,barW+10,25);
+  ctx.fillRect(hx-5,hy-5,barW+10,30);
 
   ctx.fillStyle="red";
-  ctx.fillRect(hx,hy,barW,15);
+  ctx.fillRect(hx,hy,barW,20);
 
   ctx.fillStyle="lime";
-  ctx.fillRect(hx,hy,(player.hp/100)*barW,15);
+  ctx.fillRect(hx,hy,(player.hp/100)*barW,20);
 
   // joystick
   ctx.beginPath();
-  ctx.arc(joy.baseX,joy.baseY,50,0,Math.PI*2);
-  ctx.strokeStyle="white"; ctx.stroke();
+  ctx.arc(joy.baseX,joy.baseY,joy.r,0,Math.PI*2);
+  ctx.strokeStyle="white";
+  ctx.lineWidth=3;
+  ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(joy.x,joy.y,20,0,Math.PI*2);
-  ctx.fillStyle="white"; ctx.fill();
+  ctx.arc(joy.x,joy.y,joy.knob,0,Math.PI*2);
+  ctx.fillStyle="white";
+  ctx.fill();
 
-  // fire
+  // 🔥 fire button + icon
   ctx.beginPath();
-  ctx.arc(fireX(),fireY(),40,0,Math.PI*2);
-  ctx.fillStyle="red"; ctx.fill();
+  ctx.arc(fireX(),fireY(),fireR,0,Math.PI*2);
+  ctx.fillStyle="red";
+  ctx.fill();
 
-  // 🗺️ MINI MAP
-  let miniX=10, miniY=10, size=120;
+  ctx.drawImage(bulletImg, fireX()-25, fireY()-25, 50, 50);
+
+  // 🗺️ minimap
+  let miniX=10, miniY=10, size=130;
   let scale=size/(MAP_W*TILE);
 
   ctx.fillStyle="black";
@@ -280,14 +288,12 @@ function update(){
     }
   }
 
-  // player dot
   ctx.fillStyle="white";
-  ctx.fillRect(miniX+player.x*scale,miniY+player.y*scale,4,4);
+  ctx.fillRect(miniX+player.x*scale,miniY+player.y*scale,5,5);
 
-  // enemy dots
   enemies.forEach(e=>{
     ctx.fillStyle="red";
-    ctx.fillRect(miniX+e.x*scale,miniY+e.y*scale,3,3);
+    ctx.fillRect(miniX+e.x*scale,miniY+e.y*scale,4,4);
   });
 
   // game over
@@ -296,17 +302,17 @@ function update(){
     ctx.fillRect(0,0,c.width,c.height);
 
     ctx.fillStyle="#222";
-    ctx.fillRect(c.width/2-150,c.height/2-80,300,160);
+    ctx.fillRect(c.width/2-170,c.height/2-100,340,200);
 
     ctx.fillStyle="white";
-    ctx.font="28px Arial";
-    ctx.fillText("GAME OVER",c.width/2-100,c.height/2-20);
+    ctx.font="30px Arial";
+    ctx.fillText("GAME OVER",c.width/2-110,c.height/2-30);
 
     ctx.fillStyle="red";
-    ctx.fillRect(c.width/2-80,c.height/2+20,160,50);
+    ctx.fillRect(c.width/2-100,c.height/2+30,200,60);
 
     ctx.fillStyle="white";
-    ctx.fillText("🔃 Play Again",c.width/2-65,c.height/2+50);
+    ctx.fillText("🔃 Play Again",c.width/2-80,c.height/2+70);
   }
 
   requestAnimationFrame(update);
