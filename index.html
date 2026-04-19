@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>PRO GTA FINAL</title>
+<title>PRO GTA</title>
 <style>
 body{margin:0;overflow:hidden;background:#111;touch-action:none;}
 canvas{display:block;}
@@ -15,12 +15,16 @@ canvas{display:block;}
 const c=document.getElementById("c");
 const ctx=c.getContext("2d");
 
-// INTRO
+// 🎬 INTRO
 let intro=true;
-let introScale=0.5;
+let introScale=0.3;
 let introTimer=0;
 
-// resize
+// controls
+let joy={baseX:0,baseY:0,x:0,y:0,active:false,r:60,knob:25};
+let fireX=0,fireY=0;
+let skillX=0,skillY=0;
+
 function resize(){
   c.width=innerWidth;
   c.height=innerHeight;
@@ -33,33 +37,35 @@ function resize(){
   fireX=c.width*0.85;
   fireY=c.height*0.85;
 
+  skillX=fireX;
+  skillY=fireY-100;
+
   joy.r=Math.min(c.width,c.height)*0.08;
   joy.knob=joy.r*0.4;
 }
+resize();
 window.addEventListener("resize",resize);
 
-let joy={baseX:0,baseY:0,x:0,y:0,active:false,r:60,knob:25};
-let fireX=0,fireY=0;
-resize();
-
-let moveTouchId=null,fireTouchId=null;
-
+// game vars
 let bullets=[],enemies=[];
-
 let player={x:1000,y:1000,angle:0,speed:1.8,hp:100};
 
-let score=0;
-let timeLeft=30;
+let score=0,timeLeft=30;
 let gameState="playing";
 
-// map
+// ⚡ skill
+let skillReady=false;
+let skillCharge=0;
+
+// map (STRAIGHT ROADS)
 const TILE=80,MAP_W=40,MAP_H=40;
 let map=[];
 for(let y=0;y<MAP_H;y++){
  map[y]=[];
  for(let x=0;x<MAP_W;x++){
-  let r=Math.random();
-  map[y][x]=r<0.1?"water":r<0.3?"road":"grass";
+  if(x%6===0 || y%6===0) map[y][x]="road";
+  else if(Math.random()<0.1) map[y][x]="water";
+  else map[y][x]="grass";
  }
 }
 
@@ -72,22 +78,32 @@ setInterval(()=>{
 },1000);
 
 // shoot
-function shoot(){
+function shoot(angleOverride=null){
+ let ang = angleOverride!==null ? angleOverride : player.angle;
  bullets.push({
   x:player.x,
   y:player.y,
-  vx:Math.cos(player.angle)*8,
-  vy:Math.sin(player.angle)*8
+  vx:Math.cos(ang)*8,
+  vy:Math.sin(ang)*8
  });
 }
 
+// skill fire (ALL DIRECTIONS 💥)
+function skillFire(){
+ for(let i=0;i<360;i+=20){
+  shoot(i*Math.PI/180);
+ }
+}
+
+// auto fire
+let fireTouch=false;
 setInterval(()=>{
- if(fireTouchId && gameState==="playing"){
+ if(fireTouch && gameState==="playing"){
   shoot();
  }
 },150);
 
-// enemies
+// enemy spawn
 setInterval(()=>{
  if(gameState!=="playing")return;
  let a=Math.random()*Math.PI*2;
@@ -106,35 +122,35 @@ c.addEventListener("touchstart",e=>{
   if(gameState!=="playing"){restart();return;}
 
   if(Math.hypot(t.clientX-joy.baseX,t.clientY-joy.baseY)<joy.r){
-   moveTouchId=t.identifier; joy.active=true;
+   joy.active=true;
   }
 
   if(Math.hypot(t.clientX-fireX,t.clientY-fireY)<60){
-   fireTouchId=t.identifier;
+   fireTouch=true;
+  }
+
+  if(Math.hypot(t.clientX-skillX,t.clientY-skillY)<60){
+   if(skillReady){
+    skillFire();
+    skillReady=false;
+    skillCharge=0;
+   }
   }
  }
 });
 
 c.addEventListener("touchmove",e=>{
  for(let t of e.changedTouches){
-  if(t.identifier===moveTouchId){
-   joy.x=t.clientX; joy.y=t.clientY;
-  }
+  joy.x=t.clientX;
+  joy.y=t.clientY;
  }
 });
 
 c.addEventListener("touchend",e=>{
- for(let t of e.changedTouches){
-  if(t.identifier===moveTouchId){
-   moveTouchId=null;
-   joy.active=false;
-   joy.x=joy.baseX;
-   joy.y=joy.baseY;
-  }
-  if(t.identifier===fireTouchId){
-   fireTouchId=null;
-  }
- }
+ joy.active=false;
+ fireTouch=false;
+ joy.x=joy.baseX;
+ joy.y=joy.baseY;
 });
 
 // restart
@@ -159,13 +175,18 @@ function drawMap(camX,camY){
 // loop
 function update(){
 
- // INTRO (10 sec)
+ // 🎬 INTRO FIX
  if(intro){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,c.width,c.height);
 
   ctx.save();
   ctx.translate(c.width/2,c.height/2);
+
+  if(introScale<1){
+    introScale+=0.01;
+  }
+
   ctx.scale(introScale,introScale);
 
   ctx.fillStyle="white";
@@ -174,17 +195,12 @@ function update(){
   ctx.fillText("MADE BY PRIYANSHU",0,-20);
 
   ctx.font="20px Arial";
-  let dots=".".repeat(Math.floor((introTimer/20)%4));
-  ctx.fillText("LOADING"+dots,0,30);
+  ctx.fillText("LOADING...",0,30);
 
   ctx.restore();
 
-  introScale+=0.01;
   introTimer++;
-
-  if(introTimer>600){ // ~10 sec
-    intro=false;
-  }
+  if(introTimer>600) intro=false;
 
   requestAnimationFrame(update);
   return;
@@ -200,6 +216,7 @@ function update(){
   let dx=joy.x-joy.baseX;
   let dy=joy.y-joy.baseY;
   let dist=Math.hypot(dx,dy);
+
   if(dist>5){
    let nx=dx/dist, ny=dy/dist;
    player.angle=Math.atan2(ny,nx);
@@ -225,12 +242,13 @@ function update(){
 
  // bullets
  bullets.forEach(b=>{
-  b.x+=b.vx; b.y+=b.vy;
+  b.x+=b.vx;
+  b.y+=b.vy;
   ctx.fillStyle="yellow";
   ctx.fillRect(b.x-camX,b.y-camY,5,5);
  });
 
- // enemies + DAMAGE FIX
+ // enemies
  for(let i=enemies.length-1;i>=0;i--){
   let e=enemies[i];
   let dx=player.x-e.x, dy=player.y-e.y;
@@ -263,7 +281,20 @@ function update(){
   }
  }
 
- // ❤️ health
+ // ⚡ skill charge
+ skillCharge+=0.02;
+ if(skillCharge>=10){
+  skillCharge=10;
+  skillReady=true;
+ }
+
+ // UI
+ ctx.fillStyle="white";
+ ctx.font="bold 22px Arial";
+ ctx.fillText("⏱ "+timeLeft,c.width-120,40);
+ ctx.fillText("Score: "+score,c.width-150,70);
+
+ // health
  let barW=c.width*0.5;
  let hx=c.width/2-barW/2;
  let hy=c.height-100;
@@ -274,36 +305,7 @@ function update(){
  ctx.fillStyle="lime";
  ctx.fillRect(hx,hy,(player.hp/100)*barW,15);
 
- // 🗺️ minimap FIX
- let miniX=10,miniY=10,size=120;
- let scale=size/(MAP_W*TILE);
-
- ctx.fillStyle="black";
- ctx.fillRect(miniX-2,miniY-2,size+4,size+4);
-
- for(let y1=0;y1<MAP_H;y1++){
-  for(let x1=0;x1<MAP_W;x1++){
-   let t=map[y1][x1];
-   ctx.fillStyle=t==="grass"?"#2ecc71":t==="road"?"#555":"#3498db";
-   ctx.fillRect(miniX+x1*TILE*scale,miniY+y1*TILE*scale,TILE*scale,TILE*scale);
-  }
- }
-
- ctx.fillStyle="white";
- ctx.fillRect(miniX+player.x*scale,miniY+player.y*scale,4,4);
-
- enemies.forEach(e=>{
-  ctx.fillStyle="red";
-  ctx.fillRect(miniX+e.x*scale,miniY+e.y*scale,3,3);
- });
-
- // 🔥 BIG TEXT UI
- ctx.fillStyle="white";
- ctx.font="bold 24px Arial";
- ctx.fillText("⏱ "+timeLeft,c.width-120,40);
- ctx.fillText("Score: "+score,c.width-140,70);
-
- // controls
+ // joystick
  ctx.beginPath();
  ctx.arc(joy.baseX,joy.baseY,joy.r,0,Math.PI*2);
  ctx.strokeStyle="white"; ctx.stroke();
@@ -312,35 +314,22 @@ function update(){
  ctx.arc(joy.x,joy.y,joy.knob,0,Math.PI*2);
  ctx.fillStyle="white"; ctx.fill();
 
+ // fire
  ctx.beginPath();
  ctx.arc(fireX,fireY,joy.r,0,Math.PI*2);
  ctx.fillStyle="red"; ctx.fill();
-
  ctx.fillStyle="white";
  ctx.textAlign="center";
  ctx.fillText("FIRE",fireX,fireY+5);
 
- // ☠️ GAME OVER POPUP FIX
- if(gameState!=="playing"){
-  ctx.fillStyle="rgba(0,0,0,0.6)";
-  ctx.fillRect(0,0,c.width,c.height);
+ // ⚡ skill button
+ ctx.beginPath();
+ ctx.arc(skillX,skillY,joy.r,0,Math.PI*2);
+ ctx.fillStyle=skillReady?"yellow":"gray";
+ ctx.fill();
 
-  ctx.fillStyle="#222";
-  ctx.fillRect(c.width/2-150,c.height/2-100,300,200);
-
-  ctx.fillStyle="white";
-  ctx.font="20px Arial";
-  ctx.textAlign="center";
-
-  if(gameState==="win"){
-    ctx.fillText("CONGRATULATIONS 🎉",c.width/2,c.height/2-40);
-  }else{
-    ctx.fillText("GAME OVER",c.width/2,c.height/2-40);
-  }
-
-  ctx.fillText("SCORE: "+score,c.width/2,c.height/2);
-  ctx.fillText("PLAY AGAIN",c.width/2,c.height/2+60);
- }
+ ctx.fillStyle="black";
+ ctx.fillText("⚡",skillX,skillY+5);
 
  requestAnimationFrame(update);
 }
