@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>PRO GTA</title>
+<title>PRO GTA FINAL</title>
 <style>
 body{margin:0;overflow:hidden;background:#111;touch-action:none;}
 canvas{display:block;}
@@ -15,9 +15,10 @@ canvas{display:block;}
 const c=document.getElementById("c");
 const ctx=c.getContext("2d");
 
-// 🎬 INTRO
+// INTRO
 let intro=true;
-let introScale=0.2;
+let introScale=0.5;
+let introTimer=0;
 
 // resize
 function resize(){
@@ -32,37 +33,24 @@ function resize(){
   fireX=c.width*0.85;
   fireY=c.height*0.85;
 
-  specialX=fireX;
-  specialY=fireY-100;
-
   joy.r=Math.min(c.width,c.height)*0.08;
   joy.knob=joy.r*0.4;
-  fireR=joy.r;
 }
 window.addEventListener("resize",resize);
 
-// controls
 let joy={baseX:0,baseY:0,x:0,y:0,active:false,r:60,knob:25};
-let fireX=0,fireY=0,fireR=60;
-let specialX=0,specialY=0;
-
+let fireX=0,fireY=0;
 resize();
 
 let moveTouchId=null,fireTouchId=null;
 
-let bullets=[],enemies=[],effects=[];
+let bullets=[],enemies=[];
 
 let player={x:1000,y:1000,angle:0,speed:1.8,hp:100};
 
 let score=0;
-let highScore=localStorage.getItem("hs")||0;
 let timeLeft=30;
 let gameState="playing";
-
-// ⚡ special
-let specialCharge=0;
-let specialActive=false;
-let specialTimer=0;
 
 // map
 const TILE=80,MAP_W=40,MAP_H=40;
@@ -79,43 +67,37 @@ for(let y=0;y<MAP_H;y++){
 setInterval(()=>{
  if(gameState==="playing"){
   timeLeft--;
-  if(timeLeft<=0){
-   gameState="win";
-   if(score>highScore){
-    highScore=score;
-    localStorage.setItem("hs",highScore);
-   }
-  }
+  if(timeLeft<=0) gameState="win";
  }
 },1000);
 
 // shoot
 function shoot(){
  bullets.push({
-  x:player.x,y:player.y,
+  x:player.x,
+  y:player.y,
   vx:Math.cos(player.angle)*8,
   vy:Math.sin(player.angle)*8
  });
 }
 
-// auto fire
 setInterval(()=>{
- if((fireTouchId||specialActive)&&gameState==="playing"){
+ if(fireTouchId && gameState==="playing"){
   shoot();
  }
-},120);
+},150);
 
-// spawn
+// enemies
 setInterval(()=>{
  if(gameState!=="playing")return;
  let a=Math.random()*Math.PI*2;
- let d=300+Math.random()*200;
+ let d=300;
  enemies.push({
   x:player.x+Math.cos(a)*d,
   y:player.y+Math.sin(a)*d,
   speed:1.2
  });
-},900);
+},800);
 
 // touch
 c.addEventListener("touchstart",e=>{
@@ -127,17 +109,8 @@ c.addEventListener("touchstart",e=>{
    moveTouchId=t.identifier; joy.active=true;
   }
 
-  if(Math.hypot(t.clientX-fireX,t.clientY-fireY)<fireR){
+  if(Math.hypot(t.clientX-fireX,t.clientY-fireY)<60){
    fireTouchId=t.identifier;
-  }
-
-  // special
-  if(Math.hypot(t.clientX-specialX,t.clientY-specialY)<fireR){
-   if(specialCharge>=10){
-    specialActive=true;
-    specialTimer=8;
-    specialCharge=0;
-   }
   }
  }
 });
@@ -167,11 +140,8 @@ c.addEventListener("touchend",e=>{
 // restart
 function restart(){
  player.hp=100;
- player.x=1000; player.y=1000;
- bullets=[]; enemies=[]; effects=[];
+ bullets=[]; enemies=[];
  score=0; timeLeft=30;
- specialCharge=0;
- specialActive=false;
  gameState="playing";
 }
 
@@ -189,7 +159,7 @@ function drawMap(camX,camY){
 // loop
 function update(){
 
- // 🎬 INTRO SCREEN
+ // INTRO (10 sec)
  if(intro){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,c.width,c.height);
@@ -201,12 +171,20 @@ function update(){
   ctx.fillStyle="white";
   ctx.font="bold 40px Arial";
   ctx.textAlign="center";
-  ctx.fillText("MADE BY PRIYANSHU",0,0);
+  ctx.fillText("MADE BY PRIYANSHU",0,-20);
+
+  ctx.font="20px Arial";
+  let dots=".".repeat(Math.floor((introTimer/20)%4));
+  ctx.fillText("LOADING"+dots,0,30);
 
   ctx.restore();
 
-  introScale+=0.02;
-  if(introScale>=1.5) intro=false;
+  introScale+=0.01;
+  introTimer++;
+
+  if(introTimer>600){ // ~10 sec
+    intro=false;
+  }
 
   requestAnimationFrame(update);
   return;
@@ -252,7 +230,7 @@ function update(){
   ctx.fillRect(b.x-camX,b.y-camY,5,5);
  });
 
- // enemies
+ // enemies + DAMAGE FIX
  for(let i=enemies.length-1;i>=0;i--){
   let e=enemies[i];
   let dx=player.x-e.x, dy=player.y-e.y;
@@ -266,69 +244,66 @@ function update(){
   ctx.fillStyle="red";
   ctx.fillRect(e.x-camX,e.y-camY,25,25);
 
-  // damage
   if(dist<25){
-   player.hp-=0.4;
+   player.hp-=0.5;
    if(player.hp<=0){
     player.hp=0;
     gameState="gameover";
    }
   }
 
-  // hit
   for(let j=bullets.length-1;j>=0;j--){
    let b=bullets[j];
    if(b.x<e.x+25 && b.x+5>e.x && b.y<e.y+25 && b.y+5>e.y){
     enemies.splice(i,1);
     bullets.splice(j,1);
     score+=20;
-    effects.push({x:e.x,y:e.y,r:0});
     break;
    }
   }
  }
 
- // 💥 explosion
- effects.forEach((ex,i)=>{
-  ex.r+=3;
-  ctx.beginPath();
-  ctx.arc(ex.x-camX,ex.y-camY,ex.r,0,Math.PI*2);
-  ctx.strokeStyle="orange";
-  ctx.stroke();
-  if(ex.r>30) effects.splice(i,1);
- });
-
- // special
- if(!specialActive){
-  specialCharge+=0.016;
-  if(specialCharge>10) specialCharge=10;
- }else{
-  specialTimer-=0.016;
-  if(specialTimer<=0) specialActive=false;
- }
-
- // UI
- ctx.fillStyle="white";
- ctx.font="16px Arial";
-
- // map
- ctx.fillStyle="black";
- ctx.fillRect(10,10,120,120);
-
- // timer + score
- ctx.fillText("⏱ "+Math.floor(timeLeft),c.width-80,30);
- ctx.fillText("Score: "+score,c.width-100,55);
-
- // health
+ // ❤️ health
  let barW=c.width*0.5;
  let hx=c.width/2-barW/2;
  let hy=c.height-100;
+
  ctx.fillStyle="black";
  ctx.fillRect(hx-5,hy-5,barW+10,25);
+
  ctx.fillStyle="lime";
  ctx.fillRect(hx,hy,(player.hp/100)*barW,15);
 
- // joystick
+ // 🗺️ minimap FIX
+ let miniX=10,miniY=10,size=120;
+ let scale=size/(MAP_W*TILE);
+
+ ctx.fillStyle="black";
+ ctx.fillRect(miniX-2,miniY-2,size+4,size+4);
+
+ for(let y1=0;y1<MAP_H;y1++){
+  for(let x1=0;x1<MAP_W;x1++){
+   let t=map[y1][x1];
+   ctx.fillStyle=t==="grass"?"#2ecc71":t==="road"?"#555":"#3498db";
+   ctx.fillRect(miniX+x1*TILE*scale,miniY+y1*TILE*scale,TILE*scale,TILE*scale);
+  }
+ }
+
+ ctx.fillStyle="white";
+ ctx.fillRect(miniX+player.x*scale,miniY+player.y*scale,4,4);
+
+ enemies.forEach(e=>{
+  ctx.fillStyle="red";
+  ctx.fillRect(miniX+e.x*scale,miniY+e.y*scale,3,3);
+ });
+
+ // 🔥 BIG TEXT UI
+ ctx.fillStyle="white";
+ ctx.font="bold 24px Arial";
+ ctx.fillText("⏱ "+timeLeft,c.width-120,40);
+ ctx.fillText("Score: "+score,c.width-140,70);
+
+ // controls
  ctx.beginPath();
  ctx.arc(joy.baseX,joy.baseY,joy.r,0,Math.PI*2);
  ctx.strokeStyle="white"; ctx.stroke();
@@ -337,21 +312,35 @@ function update(){
  ctx.arc(joy.x,joy.y,joy.knob,0,Math.PI*2);
  ctx.fillStyle="white"; ctx.fill();
 
- // fire
  ctx.beginPath();
- ctx.arc(fireX,fireY,fireR,0,Math.PI*2);
+ ctx.arc(fireX,fireY,joy.r,0,Math.PI*2);
  ctx.fillStyle="red"; ctx.fill();
+
  ctx.fillStyle="white";
  ctx.textAlign="center";
  ctx.fillText("FIRE",fireX,fireY+5);
 
- // special
- ctx.beginPath();
- ctx.arc(specialX,specialY,fireR,0,Math.PI*2);
- ctx.fillStyle=specialCharge>=10?"yellow":"gray";
- ctx.fill();
- ctx.fillStyle="black";
- ctx.fillText("⚡",specialX,specialY+5);
+ // ☠️ GAME OVER POPUP FIX
+ if(gameState!=="playing"){
+  ctx.fillStyle="rgba(0,0,0,0.6)";
+  ctx.fillRect(0,0,c.width,c.height);
+
+  ctx.fillStyle="#222";
+  ctx.fillRect(c.width/2-150,c.height/2-100,300,200);
+
+  ctx.fillStyle="white";
+  ctx.font="20px Arial";
+  ctx.textAlign="center";
+
+  if(gameState==="win"){
+    ctx.fillText("CONGRATULATIONS 🎉",c.width/2,c.height/2-40);
+  }else{
+    ctx.fillText("GAME OVER",c.width/2,c.height/2-40);
+  }
+
+  ctx.fillText("SCORE: "+score,c.width/2,c.height/2);
+  ctx.fillText("PLAY AGAIN",c.width/2,c.height/2+60);
+ }
 
  requestAnimationFrame(update);
 }
