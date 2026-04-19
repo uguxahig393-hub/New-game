@@ -16,8 +16,8 @@ const c = document.getElementById("c");
 const ctx = c.getContext("2d");
 
 function resize(){
-  c.width = window.innerWidth;
-  c.height = window.innerHeight;
+  c.width = innerWidth;
+  c.height = innerHeight;
 
   joy.baseX = c.width*0.15;
   joy.baseY = c.height*0.85;
@@ -33,26 +33,22 @@ function resize(){
 }
 window.addEventListener("resize", resize);
 
-// joystick
+// controls
 let joy = { baseX:0, baseY:0, x:0, y:0, active:false, r:60, knob:25 };
-
-// fire
 let fireX=0, fireY=0, fireR=60;
 
 resize();
 
-let moveTouchId=null;
-let fireTouchId=null;
+let moveTouchId=null, fireTouchId=null;
 
 let bullets=[], enemies=[];
 
 let player = { x:1000,y:1000,angle:0,speed:1.8,hp:100 };
 
-// 🎯 SCORE + TIMER
-let score = 0;
-let highScore = localStorage.getItem("highscore") || 0;
-let timeLeft = 30;
-let gameState = "playing"; // playing / win
+let score=0;
+let highScore=localStorage.getItem("highscore")||0;
+let timeLeft=30;
+let gameState="playing"; // playing, win, gameover
 
 // map
 const TILE=80, MAP_W=40, MAP_H=40;
@@ -67,15 +63,15 @@ for(let y=0;y<MAP_H;y++){
   }
 }
 
-// timer countdown
+// timer
 setInterval(()=>{
   if(gameState==="playing"){
     timeLeft--;
     if(timeLeft<=0){
       gameState="win";
-      if(score > highScore){
-        highScore = score;
-        localStorage.setItem("highscore", highScore);
+      if(score>highScore){
+        highScore=score;
+        localStorage.setItem("highscore",highScore);
       }
     }
   }
@@ -135,14 +131,13 @@ function shoot(){
   });
 }
 
-// auto fire
 setInterval(()=>{
   if(fireTouchId!==null && gameState==="playing"){
     shoot();
   }
 },180);
 
-// enemy spawn
+// enemies
 setInterval(()=>{
   if(gameState!=="playing") return;
 
@@ -176,7 +171,6 @@ function drawMap(camX,camY){
       if(t==="grass") ctx.fillStyle="#2ecc71";
       if(t==="road") ctx.fillStyle="#222";
       if(t==="water") ctx.fillStyle="#3498db";
-
       ctx.fillRect(x*TILE-camX,y*TILE-camY,TILE,TILE);
     }
   }
@@ -193,7 +187,6 @@ function update(){
     let dx=joy.x-joy.baseX;
     let dy=joy.y-joy.baseY;
     let dist=Math.hypot(dx,dy);
-
     if(dist>5){
       let nx=dx/dist, ny=dy/dist;
       player.angle=Math.atan2(ny,nx);
@@ -225,7 +218,7 @@ function update(){
     ctx.fillRect(b.x-camX,b.y-camY,5,5);
   }
 
-  // enemies
+  // enemies + DAMAGE FIX
   for(let i=enemies.length-1;i>=0;i--){
     let e=enemies[i];
     let dx=player.x-e.x, dy=player.y-e.y;
@@ -239,18 +232,27 @@ function update(){
     ctx.fillStyle="red";
     ctx.fillRect(e.x-camX,e.y-camY,25,25);
 
+    // ❤️ DAMAGE
+    if(dist<25){
+      player.hp-=0.5;
+      if(player.hp<=0){
+        player.hp=0;
+        gameState="gameover";
+      }
+    }
+
     for(let j=bullets.length-1;j>=0;j--){
       let b=bullets[j];
       if(b.x<e.x+25 && b.x+5>e.x && b.y<e.y+25 && b.y+5>e.y){
         enemies.splice(i,1);
         bullets.splice(j,1);
-        score += 20; // 🎯 SCORE
+        score+=20;
         break;
       }
     }
   }
 
-  // ❤️ health
+  // health bar
   let barW=c.width*0.5;
   let hx=c.width/2-barW/2;
   let hy=c.height-110;
@@ -265,54 +267,59 @@ function update(){
   ctx.font="16px Arial";
   ctx.fillText("Health", hx-60, hy+15);
 
-  // joystick
+  // fire + joystick
   ctx.beginPath();
   ctx.arc(joy.baseX,joy.baseY,joy.r,0,Math.PI*2);
-  ctx.strokeStyle="white";
-  ctx.stroke();
+  ctx.strokeStyle="white"; ctx.stroke();
 
   ctx.beginPath();
   ctx.arc(joy.x,joy.y,joy.knob,0,Math.PI*2);
-  ctx.fillStyle="white";
-  ctx.fill();
+  ctx.fillStyle="white"; ctx.fill();
 
-  // fire
   ctx.beginPath();
   ctx.arc(fireX,fireY,fireR,0,Math.PI*2);
-  ctx.fillStyle="red";
-  ctx.fill();
+  ctx.fillStyle="red"; ctx.fill();
 
   ctx.fillStyle="white";
   ctx.textAlign="center";
   ctx.fillText("FIRE", fireX, fireY+5);
 
-  // ⏱️ TIMER
-  ctx.fillStyle="white";
-  ctx.font="20px Arial";
-  ctx.fillText("⏱ "+timeLeft, c.width-80, 30);
+  // timer + score
+  ctx.fillText("⏱ "+timeLeft, c.width-70, 30);
+  ctx.fillText("Score: "+score, 70, 30);
 
-  // 🎯 SCORE
-  ctx.fillText("Score: "+score, 80, 30);
+  // 🏆 WIN / GAME OVER BOX (FIXED CENTER TEXT)
+  if(gameState!=="playing"){
+    let boxW=c.width*0.7;
+    let boxH=c.height*0.3;
+    let bx=c.width/2-boxW/2;
+    let by=c.height/2-boxH/2;
 
-  // 🏆 WIN SCREEN
-  if(gameState==="win"){
-    ctx.fillStyle="rgba(0,0,0,0.6)";
+    ctx.fillStyle="rgba(0,0,0,0.7)";
     ctx.fillRect(0,0,c.width,c.height);
 
     ctx.fillStyle="#222";
-    ctx.fillRect(c.width/2-150,c.height/2-120,300,240);
+    ctx.fillRect(bx,by,boxW,boxH);
 
     ctx.fillStyle="white";
-    ctx.font="22px Arial";
-    ctx.fillText("CONGRATULATIONS 🎉", c.width/2-130, c.height/2-60);
-    ctx.fillText("YOU SCORED: "+score, c.width/2-110, c.height/2-20);
-    ctx.fillText("HIGHEST: "+highScore, c.width/2-90, c.height/2+20);
+    ctx.textAlign="center";
+    ctx.font="18px Arial";
 
+    if(gameState==="win"){
+      ctx.fillText("CONGRATULATIONS 🎉", c.width/2, by+40);
+    }else{
+      ctx.fillText("GAME OVER", c.width/2, by+40);
+    }
+
+    ctx.fillText("YOU SCORED: "+score, c.width/2, by+80);
+    ctx.fillText("HIGHEST: "+highScore, c.width/2, by+110);
+
+    // button
     ctx.fillStyle="red";
-    ctx.fillRect(c.width/2-100,c.height/2+60,200,50);
+    ctx.fillRect(c.width/2-80, by+140,160,40);
 
     ctx.fillStyle="white";
-    ctx.fillText("PLAY AGAIN", c.width/2, c.height/2+95);
+    ctx.fillText("PLAY AGAIN", c.width/2, by+165);
   }
 
   requestAnimationFrame(update);
