@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>GTA Mobile Final</title>
+<title>Mini GTA Mobile</title>
 <style>
 body { margin:0; overflow:hidden; background:#111; touch-action:none; }
 canvas { display:block; }
@@ -22,26 +22,24 @@ function resize(){
 resize();
 window.addEventListener("resize", resize);
 
-// 🔥 BIGGER JOYSTICK
+// joystick
 const joy = { baseX:130, baseY:0, x:130, y:0, active:false, r:70, knob:30 };
 function updateJoy(){ joy.baseY = c.height-150; joy.y = joy.baseY; }
 updateJoy();
 
-// 🔥 BIGGER FIRE BUTTON
+// fire button
 function fireX(){ return c.width-130 }
 function fireY(){ return c.height-150 }
 const fireR = 70;
-
-// bullet image
-const bulletImg = new Image();
-bulletImg.src = "https://cdn-icons-png.flaticon.com/512/3097/3097144.png";
 
 let moveTouchId=null;
 let fireTouchId=null;
 
 let bullets=[], enemies=[];
 
-let player = { x:1000,y:1000,angle:0,speed:3,hp:100 };
+// 🔥 SPEED REDUCED
+let player = { x:1000,y:1000,angle:0,speed:1.8,hp:100 };
+
 let gameOver=false;
 
 // map
@@ -110,8 +108,8 @@ function shoot(){
   bullets.push({
     x:player.x,
     y:player.y,
-    vx:Math.cos(player.angle)*10,
-    vy:Math.sin(player.angle)*10
+    vx:Math.cos(player.angle)*8,
+    vy:Math.sin(player.angle)*8
   });
 }
 
@@ -120,7 +118,7 @@ setInterval(()=>{
   if(fireTouchId!==null && !gameOver){
     shoot();
   }
-},150);
+},180);
 
 // enemies
 setInterval(()=>{
@@ -132,9 +130,9 @@ setInterval(()=>{
   enemies.push({
     x:player.x+Math.cos(a)*d,
     y:player.y+Math.sin(a)*d,
-    speed:1.5
+    speed:1.2
   });
-},800);
+},900);
 
 // restart
 function restart(){
@@ -167,16 +165,20 @@ function update(){
   let camX=player.x-c.width/2;
   let camY=player.y-c.height/2;
 
-  // movement
+  // movement smoother + slower
   if(joy.active){
     let dx=joy.x-joy.baseX;
     let dy=joy.y-joy.baseY;
     let dist=Math.hypot(dx,dy);
 
     if(dist>5){
-      player.angle=Math.atan2(dy,dx);
-      player.x+=Math.cos(player.angle)*player.speed;
-      player.y+=Math.sin(player.angle)*player.speed;
+      let nx = dx/dist;
+      let ny = dy/dist;
+
+      player.angle=Math.atan2(ny,nx);
+
+      player.x+=nx*player.speed;
+      player.y+=ny*player.speed;
     }
   }
 
@@ -219,7 +221,7 @@ function update(){
     ctx.fillRect(e.x-camX,e.y-camY,25,25);
 
     if(dist<25){
-      player.hp-=0.4;
+      player.hp-=0.3;
       if(player.hp<=0){
         player.hp=0;
         gameOver=true;
@@ -262,13 +264,16 @@ function update(){
   ctx.fillStyle="white";
   ctx.fill();
 
-  // 🔥 fire button + icon
+  // 🔥 fire button TEXT
   ctx.beginPath();
   ctx.arc(fireX(),fireY(),fireR,0,Math.PI*2);
   ctx.fillStyle="red";
   ctx.fill();
 
-  ctx.drawImage(bulletImg, fireX()-25, fireY()-25, 50, 50);
+  ctx.fillStyle="white";
+  ctx.font="bold 20px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("FIRE", fireX(), fireY()+6);
 
   // 🗺️ minimap
   let miniX=10, miniY=10, size=130;
