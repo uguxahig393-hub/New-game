@@ -18,28 +18,36 @@ const ctx = c.getContext("2d");
 function resize(){
   c.width = innerWidth;
   c.height = innerHeight;
+
+  // responsive sizes
+  joy.baseX = 0.15 * c.width;
+  joy.baseY = c.height - 0.15 * c.height;
+  joy.x = joy.baseX;
+  joy.y = joy.baseY;
+
+  fireBtnX = c.width - 0.15 * c.width;
+  fireBtnY = c.height - 0.15 * c.height;
+
+  joy.r = Math.min(c.width, c.height) * 0.09;
+  joy.knob = joy.r * 0.4;
+  fireR = joy.r;
 }
-resize();
 window.addEventListener("resize", resize);
 
 // joystick
-const joy = { baseX:130, baseY:0, x:130, y:0, active:false, r:70, knob:30 };
-function updateJoy(){ joy.baseY = c.height-150; joy.y = joy.baseY; }
-updateJoy();
+let joy = { baseX:100, baseY:100, x:100, y:100, active:false, r:60, knob:25 };
 
 // fire button
-function fireX(){ return c.width-130 }
-function fireY(){ return c.height-150 }
-const fireR = 70;
+let fireBtnX = 0, fireBtnY = 0, fireR = 60;
+
+resize();
 
 let moveTouchId=null;
 let fireTouchId=null;
 
 let bullets=[], enemies=[];
 
-// 🔥 SPEED REDUCED
 let player = { x:1000,y:1000,angle:0,speed:1.8,hp:100 };
-
 let gameOver=false;
 
 // map
@@ -73,7 +81,7 @@ c.addEventListener("touchstart", e=>{
       joy.active=true;
     }
 
-    if(Math.hypot(t.clientX-fireX(),t.clientY-fireY())<fireR){
+    if(Math.hypot(t.clientX-fireBtnX,t.clientY-fireBtnY)<fireR){
       fireTouchId=t.identifier;
     }
   }
@@ -165,18 +173,15 @@ function update(){
   let camX=player.x-c.width/2;
   let camY=player.y-c.height/2;
 
-  // movement smoother + slower
+  // movement
   if(joy.active){
     let dx=joy.x-joy.baseX;
     let dy=joy.y-joy.baseY;
     let dist=Math.hypot(dx,dy);
 
     if(dist>5){
-      let nx = dx/dist;
-      let ny = dy/dist;
-
+      let nx=dx/dist, ny=dy/dist;
       player.angle=Math.atan2(ny,nx);
-
       player.x+=nx*player.speed;
       player.y+=ny*player.speed;
     }
@@ -201,7 +206,6 @@ function update(){
   for(let i=bullets.length-1;i>=0;i--){
     let b=bullets[i];
     b.x+=b.vx; b.y+=b.vy;
-
     ctx.fillStyle="yellow";
     ctx.fillRect(b.x-camX,b.y-camY,5,5);
   }
@@ -238,8 +242,8 @@ function update(){
     }
   }
 
-  // ❤️ health
-  let barW=c.width*0.6;
+  // ❤️ HEALTH + TEXT
+  let barW=c.width*0.5;
   let hx=c.width/2-barW/2;
   let hy=c.height-110;
 
@@ -251,6 +255,10 @@ function update(){
 
   ctx.fillStyle="lime";
   ctx.fillRect(hx,hy,(player.hp/100)*barW,20);
+
+  ctx.fillStyle="white";
+  ctx.font="16px Arial";
+  ctx.fillText("Health", hx-60, hy+15);
 
   // joystick
   ctx.beginPath();
@@ -264,20 +272,23 @@ function update(){
   ctx.fillStyle="white";
   ctx.fill();
 
-  // 🔥 fire button TEXT
+  // fire button
   ctx.beginPath();
-  ctx.arc(fireX(),fireY(),fireR,0,Math.PI*2);
+  ctx.arc(fireBtnX,fireBtnY,fireR,0,Math.PI*2);
   ctx.fillStyle="red";
   ctx.fill();
 
   ctx.fillStyle="white";
-  ctx.font="bold 20px Arial";
+  ctx.font="bold 16px Arial";
   ctx.textAlign="center";
-  ctx.fillText("FIRE", fireX(), fireY()+6);
+  ctx.fillText("FIRE", fireBtnX, fireBtnY+5);
 
-  // 🗺️ minimap
+  // 🗺️ MINI MAP WITH BLACK BORDER
   let miniX=10, miniY=10, size=130;
   let scale=size/(MAP_W*TILE);
+
+  ctx.fillStyle="black";
+  ctx.fillRect(miniX-3,miniY-3,size+6,size+6); // border
 
   ctx.fillStyle="black";
   ctx.fillRect(miniX,miniY,size,size);
@@ -300,25 +311,6 @@ function update(){
     ctx.fillStyle="red";
     ctx.fillRect(miniX+e.x*scale,miniY+e.y*scale,4,4);
   });
-
-  // game over
-  if(gameOver){
-    ctx.fillStyle="rgba(0,0,0,0.5)";
-    ctx.fillRect(0,0,c.width,c.height);
-
-    ctx.fillStyle="#222";
-    ctx.fillRect(c.width/2-170,c.height/2-100,340,200);
-
-    ctx.fillStyle="white";
-    ctx.font="30px Arial";
-    ctx.fillText("GAME OVER",c.width/2-110,c.height/2-30);
-
-    ctx.fillStyle="red";
-    ctx.fillRect(c.width/2-100,c.height/2+30,200,60);
-
-    ctx.fillStyle="white";
-    ctx.fillText("🔃 Play Again",c.width/2-80,c.height/2+70);
-  }
 
   requestAnimationFrame(update);
 }
